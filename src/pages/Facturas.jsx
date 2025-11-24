@@ -34,6 +34,9 @@ const sampleFacturas = [
 
 export default function Facturas(){
   const [data, setData] = useState([])
+  const [filteredData, setFilteredData] = useState([])
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filtroEstado, setFiltroEstado] = useState('Todos')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [clientes, setClientes] = useState([])
@@ -59,12 +62,35 @@ export default function Facturas(){
     setClientes(savedClientes)
     setEntidades(savedEntidades)
 
-    if(savedFacturas) setData(savedFacturas)
-    else {
+    if(savedFacturas) {
+      setData(savedFacturas)
+      setFilteredData(savedFacturas)
+    } else {
       setData(sampleFacturas)
+      setFilteredData(sampleFacturas)
       localStorage.setItem('mock_facturas', JSON.stringify(sampleFacturas))
     }
   }, [])
+
+  useEffect(() => {
+    let resultado = [...data]
+
+    // Filtrar por búsqueda
+    if (searchTerm) {
+      resultado = resultado.filter(f =>
+        f.numeroFactura.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        f.clienteNombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        f.entidadNombre.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
+
+    // Filtrar por estado
+    if (filtroEstado !== 'Todos') {
+      resultado = resultado.filter(f => f.estado === filtroEstado)
+    }
+
+    setFilteredData(resultado)
+  }, [searchTerm, filtroEstado, data])
 
   const openModal = (factura = null) => {
     if(factura) {
@@ -128,6 +154,15 @@ export default function Facturas(){
     notify.success('Factura eliminada correctamente')
   }
 
+  const cambiarEstado = (id, nuevoEstado) => {
+    const updated = data.map(item =>
+      item.id === id ? { ...item, estado: nuevoEstado } : item
+    )
+    setData(updated)
+    localStorage.setItem('mock_facturas', JSON.stringify(updated))
+    notify.success(`Factura ${nuevoEstado.toLowerCase()}`)
+  }
+
   const update = (key, value) => setForm({...form, [key]: value})
 
   const getEstadoBadge = (estado) => {
@@ -167,6 +202,42 @@ export default function Facturas(){
               <span className="text-xl">+</span>
               Registro Rápido
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Buscar</label>
+            <div className="relative">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar por N° factura, cliente o entidad..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500"
+              />
+              <svg className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Estado</label>
+            <select
+              value={filtroEstado}
+              onChange={(e) => setFiltroEstado(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500"
+            >
+              <option>Todos</option>
+              <option>Pendiente</option>
+              <option>Aprobada</option>
+              <option>Rechazada</option>
+              <option>Pagada</option>
+            </select>
           </div>
         </div>
       </div>
@@ -213,7 +284,7 @@ export default function Facturas(){
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {data.map((factura) => (
+              {filteredData.map((factura) => (
                 <tr key={factura.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                   <td className="px-4 py-4 whitespace-nowrap">
                     <div className="font-mono font-semibold text-gray-900 dark:text-white">{factura.numeroFactura}</div>
@@ -245,6 +316,35 @@ export default function Facturas(){
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
+                      {/* Botones de cambio de estado rápido */}
+                      {factura.estado === 'Pendiente' && (
+                        <>
+                          <button
+                            onClick={() => cambiarEstado(factura.id, 'Aprobada')}
+                            className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors"
+                            title="Aprobar"
+                          >
+                            ✓
+                          </button>
+                          <button
+                            onClick={() => cambiarEstado(factura.id, 'Rechazada')}
+                            className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors"
+                            title="Rechazar"
+                          >
+                            ✗
+                          </button>
+                        </>
+                      )}
+                      {factura.estado === 'Aprobada' && (
+                        <button
+                          onClick={() => cambiarEstado(factura.id, 'Pagada')}
+                          className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors"
+                          title="Marcar como Pagada"
+                        >
+                          Pagar
+                        </button>
+                      )}
+
                       {/* Dropdown de descargas */}
                       <div className="relative group">
                         <button className="px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1">
@@ -312,9 +412,9 @@ export default function Facturas(){
               ))}
             </tbody>
           </table>
-          {data.length === 0 && (
+          {filteredData.length === 0 && (
             <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-              No hay facturas registradas
+              {data.length === 0 ? 'No hay facturas registradas' : 'No se encontraron facturas con los filtros aplicados'}
             </div>
           )}
         </div>

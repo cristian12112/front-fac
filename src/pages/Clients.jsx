@@ -3,17 +3,53 @@ import { Link } from 'react-router-dom'
 import { notify, confirmDialog } from '../utils/notify'
 
 const sample = [
-  { id:1, nombre:'Acme S.A.', tipoDocumento:'RUC', documento:'20123456789', direccion:'Av. Siempreviva 123', telefono:'987654321', email:'contacto@acme.com', estado:'Activo' },
-  { id:2, nombre:'Empresa XYZ', tipoDocumento:'DNI', documento:'12345678', direccion:'Calle Falsa 456', telefono:'912345678', email:'info@xyz.com', estado:'Activo' },
+  { id:1, nombre:'Acme S.A.', tipoDocumento:'RUC', documento:'20123456789', direccion:'Av. Siempreviva 123', telefono:'987654321', email:'contacto@acme.com', estado:'Activo', tipoCliente:'Cliente', lineaCredito: '200000', limiteFactura: '80000' },
+  { id:2, nombre:'Empresa XYZ', tipoDocumento:'DNI', documento:'12345678', direccion:'Calle Falsa 456', telefono:'912345678', email:'info@xyz.com', estado:'Activo', tipoCliente:'Cliente', lineaCredito: '150000', limiteFactura: '60000' },
 ]
 
 export default function Clients(){
   const [data, setData] = useState([])
+  const [filteredData, setFilteredData] = useState([])
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filtroEstado, setFiltroEstado] = useState('Todos')
+  const [filtroTipo, setFiltroTipo] = useState('Todos')
+
   useEffect(()=>{
     const saved = JSON.parse(localStorage.getItem('mock_clients') || 'null')
-    if(saved) setData(saved)
-    else { setData(sample); localStorage.setItem('mock_clients', JSON.stringify(sample)) }
+    if(saved) {
+      setData(saved)
+      setFilteredData(saved)
+    } else {
+      setData(sample)
+      setFilteredData(sample)
+      localStorage.setItem('mock_clients', JSON.stringify(sample))
+    }
   },[])
+
+  useEffect(() => {
+    let resultado = [...data]
+
+    // Filtrar por búsqueda
+    if (searchTerm) {
+      resultado = resultado.filter(c =>
+        c.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.documento.includes(searchTerm) ||
+        c.email.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    }
+
+    // Filtrar por estado
+    if (filtroEstado !== 'Todos') {
+      resultado = resultado.filter(c => c.estado === filtroEstado)
+    }
+
+    // Filtrar por tipo
+    if (filtroTipo !== 'Todos') {
+      resultado = resultado.filter(c => (c.tipoCliente || 'Cliente') === filtroTipo)
+    }
+
+    setFilteredData(resultado)
+  }, [searchTerm, filtroEstado, filtroTipo, data])
 
   const del = (id) => {
     if(!confirmDialog('¿Eliminar este cliente?')) return;
@@ -41,6 +77,53 @@ export default function Clients(){
         </div>
       </div>
 
+      {/* Search and Filters */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Buscar</label>
+            <div className="relative">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar por nombre, documento o email..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+              />
+              <svg className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Estado</label>
+            <select
+              value={filtroEstado}
+              onChange={(e) => setFiltroEstado(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+            >
+              <option>Todos</option>
+              <option>Activo</option>
+              <option>Inactivo</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tipo</label>
+            <select
+              value={filtroTipo}
+              onChange={(e) => setFiltroTipo(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+            >
+              <option>Todos</option>
+              <option>Cliente</option>
+              <option>Deudor</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* Stats Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
@@ -65,6 +148,7 @@ export default function Clients(){
               <tr className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-700 border-b border-gray-200 dark:border-gray-600">
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Cliente</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Documento</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Tipo</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Contacto</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Dirección</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Estado</th>
@@ -72,7 +156,7 @@ export default function Clients(){
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {data.map(c => (
+              {filteredData.map(c => (
                 <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -94,6 +178,15 @@ export default function Clients(){
                     </div>
                   </td>
                   <td className="px-6 py-4">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      c.tipoCliente === 'Cliente'
+                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                        : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
+                    }`}>
+                      {c.tipoCliente || 'Cliente'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
                     <div className="text-gray-700 dark:text-gray-300">{c.telefono}</div>
                   </td>
                   <td className="px-6 py-4 text-gray-700 dark:text-gray-300 max-w-xs truncate">{c.direccion}</td>
@@ -107,20 +200,28 @@ export default function Clients(){
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={() => del(c.id)}
-                      className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors"
-                    >
-                      Eliminar
-                    </button>
+                    <div className="flex justify-end gap-2">
+                      <Link
+                        to={`/clients/edit/${c.id}`}
+                        className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors"
+                      >
+                        Editar
+                      </Link>
+                      <button
+                        onClick={() => del(c.id)}
+                        className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {data.length === 0 && (
+          {filteredData.length === 0 && (
             <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-              No hay clientes registrados
+              {data.length === 0 ? 'No hay clientes registrados' : 'No se encontraron clientes con los filtros aplicados'}
             </div>
           )}
         </div>

@@ -1,14 +1,33 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { notify } from '../utils/notify'
 import { buscarDatosRUC } from '../utils/sunatApi'
+import { validarDocumento, validarEmail, validarTelefono, getMensajeErrorDocumento, existeDocumento } from '../utils/validations'
 
 export default function AddClient(){
+  const { id } = useParams()
   const [form, setForm] = useState({
-    nombre:'', tipoDocumento:'RUC', documento:'', direccion:'', telefono:'', email:'', contacto:'', fechaRegistro:'', estado:'Activo', observaciones:'', ciiu:'', actividadEconomica:''
+    nombre:'', tipoDocumento:'RUC', documento:'', direccion:'', telefono:'', email:'', contacto:'', fechaRegistro:'', estado:'Activo', tipoCliente:'Cliente', observaciones:'', ciiu:'', actividadEconomica:'', lineaCredito: '', limiteFactura: ''
   })
   const [consultando, setConsultando] = useState(false)
+  const [clientes, setClientes] = useState([])
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const savedClientes = JSON.parse(localStorage.getItem('mock_clients') || '[]')
+    setClientes(savedClientes)
+
+    // Si hay ID, cargar datos del cliente para editar
+    if (id) {
+      const cliente = savedClientes.find(c => c.id === parseInt(id))
+      if (cliente) {
+        setForm(cliente)
+      } else {
+        notify.error('Cliente no encontrado')
+        navigate('/clients')
+      }
+    }
+  }, [id, navigate])
 
   const update = (k,v) => setForm({...form, [k]: v})
 
@@ -48,11 +67,50 @@ export default function AddClient(){
 
   const submit = (e) => {
     e.preventDefault()
+
+    // Validar documento
+    const errorDocumento = getMensajeErrorDocumento(form.tipoDocumento, form.documento)
+    if (errorDocumento) {
+      notify.error(errorDocumento)
+      return
+    }
+
+    // Validar duplicados
+    if (existeDocumento(form.documento, clientes, id ? parseInt(id) : null)) {
+      notify.error(`Ya existe un cliente con el ${form.tipoDocumento} ${form.documento}`)
+      return
+    }
+
+    // Validar email
+    if (form.email && !validarEmail(form.email)) {
+      notify.error('El email no es válido')
+      return
+    }
+
+    // Validar teléfono
+    if (form.telefono && !validarTelefono(form.telefono)) {
+      notify.error('El teléfono no es válido (debe tener 9 dígitos)')
+      return
+    }
+
     const clients = JSON.parse(localStorage.getItem('mock_clients') || '[]')
-    const id = clients.length ? Math.max(...clients.map(c=>c.id))+1 : 1
-    clients.push({ id, ...form })
-    localStorage.setItem('mock_clients', JSON.stringify(clients))
-    notify.success('Cliente agregado exitosamente')
+
+    if (id) {
+      // Editar cliente existente
+      const index = clients.findIndex(c => c.id === parseInt(id))
+      if (index !== -1) {
+        clients[index] = { ...form, id: parseInt(id) }
+        localStorage.setItem('mock_clients', JSON.stringify(clients))
+        notify.success('Cliente actualizado exitosamente')
+      }
+    } else {
+      // Agregar nuevo cliente
+      const newId = clients.length ? Math.max(...clients.map(c=>c.id))+1 : 1
+      clients.push({ id: newId, ...form })
+      localStorage.setItem('mock_clients', JSON.stringify(clients))
+      notify.success('Cliente agregado exitosamente')
+    }
+
     navigate('/clients')
   }
 
@@ -65,8 +123,8 @@ export default function AddClient(){
       <div className="max-w-3xl mx-auto">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl overflow-hidden">
           <div className="bg-gradient-to-r from-blue-500 to-blue-700 text-white px-6 py-4">
-            <h2 className="text-2xl font-bold">Agregar Nuevo Cliente</h2>
-            <p className="text-blue-100 text-sm mt-1">Complete el formulario para registrar un nuevo cliente</p>
+            <h2 className="text-2xl font-bold">{id ? 'Editar Cliente' : 'Agregar Nuevo Cliente'}</h2>
+            <p className="text-blue-100 text-sm mt-1">{id ? 'Actualiza la información del cliente' : 'Complete el formulario para registrar un nuevo cliente'}</p>
           </div>
 
           <form onSubmit={submit} className="p-6 space-y-4">
@@ -198,6 +256,18 @@ export default function AddClient(){
                 </select>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tipo de Cliente *</label>
+                <select
+                  value={form.tipoCliente}
+                  onChange={e=>update('tipoCliente', e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                >
+                  <option>Cliente</option>
+                  <option>Deudor</option>
+                </select>
+              </div>
+
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Dirección</label>
                 <input
@@ -228,6 +298,44 @@ export default function AddClient(){
                 />
               </div>
 
+              {form.tipoCliente === 'Cliente' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Línea de Crédito (S/.)
+                      <span className="ml-2 text-xs text-gray-500">Opcional</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={form.lineaCredito}
+                      onChange={e=>update('lineaCredito', e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="100000.00"
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Monto total de crédito aprobado</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Límite por Factura (S/.)
+                      <span className="ml-2 text-xs text-gray-500">Opcional</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={form.limiteFactura}
+                      onChange={e=>update('limiteFactura', e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      placeholder="50000.00"
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Monto máximo por factura individual</p>
+                  </div>
+                </>
+              )}
+
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Observaciones</label>
                 <textarea
@@ -252,7 +360,7 @@ export default function AddClient(){
                 type="submit"
                 className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-lg hover:from-blue-600 hover:to-blue-800 font-medium shadow-lg hover:shadow-xl transition-all"
               >
-                Guardar Cliente
+                {id ? 'Actualizar Cliente' : 'Guardar Cliente'}
               </button>
             </div>
           </form>

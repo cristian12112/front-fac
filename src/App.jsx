@@ -26,6 +26,7 @@ export default function App(){
         <Route path="/" element={<RequireAuth><Header/><Dashboard/></RequireAuth>} />
         <Route path="/clients" element={<RequireAuth><Header/><Clients/></RequireAuth>} />
         <Route path="/clients/new" element={<RequireAuth><Header/><AddClient/></RequireAuth>} />
+        <Route path="/clients/edit/:id" element={<RequireAuth><Header/><AddClient/></RequireAuth>} />
         <Route path="/entidaFin" element={<RequireAuth><Header/><EntidadesFinancieras/></RequireAuth>} />
         <Route path="/factura" element={<RequireAuth><Header/><Facturas/></RequireAuth>} />
         <Route path="/factura/cargar" element={<RequireAuth><Header/><CargarFactura/></RequireAuth>} />
